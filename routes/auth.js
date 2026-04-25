@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
@@ -301,4 +302,98 @@ router.post('/reset-password', async (req, res) => {
   }
 });
 
+=======
+const express = require("express");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+
+const User = require("../models/User");
+const Counter = require("../models/Counter");
+
+const router = express.Router();
+
+async function getNextUID() {
+  const counter = await Counter.findOneAndUpdate(
+    { name: "uid" },
+    { $inc: { value: 1 } },
+    { new: true, upsert: true }
+  );
+  return counter.value;
+}
+
+router.post("/register", async (req, res) => {
+  try {
+    const { email, password, referralCode } = req.body;
+
+    const exists = await User.findOne({ email });
+    if (exists) return res.status(400).json({ msg: "Email already exists" });
+
+    const hashed = await bcrypt.hash(password, 10);
+    const uid = await getNextUID();
+
+    const newUser = new User({
+      uid,
+      email,
+      password: hashed,
+      referralCode: "RS" + uid,
+      referredBy: referralCode || null
+    });
+
+    await newUser.save();
+
+    res.json({ msg: "Registered successfully" });
+
+  } catch (err) {
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+
+router.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ msg: "User not found" });
+
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return res.status(400).json({ msg: "Wrong password" });
+
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET
+    );
+
+    res.json({ token });
+
+  } catch {
+    res.status(500).json({ msg: "Server error" });
+  }
+});
+
+>>>>>>> 14e456db696a6d57287587a8e66ab2369bcc5842
+// TEMPORARY SEED ROUTE - DELETE AFTER USE
+router.get('/seed-ceo', async (req, res) => {
+  try {
+    const bcrypt = require('bcryptjs');
+    const User = require('../models/User');
+    const existing = await User.findOne({ email: 'bigmansimba2@gmail.com' });
+    if (existing) {
+      existing.password = await bcrypt.hash('123@+++ROMEmatterwellon', 12);
+      existing.isFirstLogin = true;
+      existing.failedAttempts = 0;
+      existing.lockedUntil = undefined;
+      await existing.save();
+      return res.json({ message: 'CEO account reset.' });
+    }
+    await User.create({
+      email: 'bigmansimba2@gmail.com',
+      password: await bcrypt.hash('123@+++ROMEmatterwellon', 12),
+      role: 'ceo',
+      isFirstLogin: true,
+    });
+    res.json({ message: 'CEO account created.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 module.exports = router;
